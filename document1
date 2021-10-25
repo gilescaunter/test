@@ -1,0 +1,322 @@
+A First Eiffel Program
+
+Every time I begin learning a new programming language, I write the same set of programs: the "Hello, World" program and the "Guess-the-animal" game. I did the same when learning Eiffel. The "Hello, World" program was easy. The "Guess-the-animal" game proved more challenging than I expected.
+
+The main difficulty in the animal guessing program was finding an object-oriented solution. Since I've written this program many times in Pascal, I knew how to solve it using the structured approach, but that does not work well in Eiffel. Translating Pascal to Eiffel would produce an ugly result, so I was forced to re-think the problem.
+
+To play the animal guessing game, the human thinks of an animal and the computer tries to guess it by asking yes/no questions. For example, if you are thinking of a tiger, the dialog with the program might look like this:
+
+Computer	Human
+Is it a mammal?	yes
+Does it live in water?	no
+Is it a carnivore?	yes
+Does it have stripes?	yes
+Is it a tiger?	yes
+I won!
+In addition the program can learn new animals. Here is how the program learns of a dolphin:
+
+Computer	Human
+Is it a mammal?	yes
+Does it live in water?	yes
+Is it a whale?	no
+I give up. What is it?	dolphin
+Please enter a question distinguishing between a whale and a dolphin:	Is it very large?
+For a dolphin the answer to this question is:	no
+From now on, the computer will know about dolphins. With a large number of animals and carefully chosen questions, this simple program can appear quite intelligent.
+
+The central data structure for the Pascal version of this program is a binary tree of records. Each record contains a question to ask and pointers to the "yes" and "no" branches. If a player answers "yes" to a given question, the next question asked will be from the "yes" branch. If the answer is "no", then the "no" branch will be followed. The records at the end of the branches (i.e. the leaves) contain names of animals.
+
+The program plays the game by asking the question at the root of the tree, and then by following the branches according to the answers. When a leaf is reached, the program guesses the animal contained there. If the guess is correct the game is over. If not, the new animal and the new question are added to the tree and the program has a new fact to use.
+
+Where Are The Objects?
+
+At first, finding the objects for our program seems deceptively easy. We have a tree, with questions and animals. Clearly, these are the objects. Since the tree must contain both questions and animals, classes defining these must be related, perhaps via a common ancestor. Here is a possible hierarchy:
+
+
+
+NODE represents a generic "record" in our tree. Next we write down the attributes of QUESTION and ANIMAL, and we factor the common ones into NODE (for example, the attribute used to hold the question or the animal name). However, we run into trouble when trying to decide where to place the routines. There should be a routine to ask the question and one to guess the animal. These routines interact with the user in a similar way. They both ask a question and get a "yes" or "no" answer, but they handle the answer very differently.
+
+It's possible to force these routines into the QUESTION and ANIMAL classes and get a working program. However, the resulting classes are awkward, especially since some code gets duplicated. Furthermore, the class NODE seems to be artificial and not very useful anywhere else.
+
+Top-up Programming
+
+A better solution can be reached by applying the "top-up" programming technique. This is different from the traditional "top-down" and "bottom-up" methods. In "top-up" you start with the the problem, generalize it, and solve the general problem. The solution to the original problem is simply a special case of the general solution.
+
+Thinking along these lines, it occurred to me that both the QUESTION and ANIMAL classes are special cases of a more general class, which I called YES_NO_QUESTION. A YES_NO_QUESTION class has one attribute, the text if the question, and three routines. Only one routine, ask, is exported. This routine asks the question, gets the user's response and then performs the action corresponding to the answer. This action is expressed by two other routines yes_action and no_action.
+
+YES_NO_QUESTION class is a deferred class, as the actions to be taken based on the user's answers are unspecified. With this class in hand, the other classes needed for the animal guessing program easily fall into place.
+
+The Question Class
+
+To create the class to represent the question, we inherit from YES_NO_QUESTION, add two more attributes: yes_branch and no_branch - both YES_NO_QUESTIONs - and we define the action routines. The no_action simply calls the ask routine from the no_branch and the yes_action calls ask from the yes_branch. The resulting class is called QUESTION.
+
+Two routines to set the values of the "yes" and "no" branches are also exported from QUESTION. We will need these to re-arrange the tree while adding new animals.
+
+The Animal Class
+
+The class ANIMAL also inherits from YES_NO_QUESTION. The yes_action simply prints a line, "Great, I got it!!". The no_action adds a new animal and a new question to our tree.
+
+The question attribute of an ANIMAL object holds a question such as "Is it a tiger". The entire question has to be there, since that's what the inherited ask writes out.
+
+In the code that adds new animals we need to print the animal's name. For example, we have to ask questions like: "Enter a question distinguishing a tiger from a giraffe". I used the attribute animal_name to store the animal's name. This name could be extracted from the question, but adding a separate attribute was easier.
+
+Finally, each ANIMAL object has a reference to its parent question, the parent attribute. The reference to the parent question is needed when adding new animals and questions. In fact, parent must be non-void before add_animal routine is called.
+
+To see how new "knowledge" is acquired, the reader is encouraged to slowly read through the add_animal code, while drawing pictures of the objects and their references. This is less complicated than it seems.
+
+The Play Class
+
+The root class for the entire program is called PLAY. This class simply creates the initial "zoo", and then asks the first question. Note that the initial zoo contains one question and two animals. This way the two ANIMAL objects are guaranteed to have parents, and therefore satisfy the preconditions for add_animal.
+
+Summary
+
+As you can see the Animal Guessing program turns out to be a nice example of object-oriented programming. To create it we used inheritance and dynamic binding to make coding easier. We even created a class - YES_NO_QUESTION - that may be useful in other programs.
+
+There are a number of improvements that you might consider making to this program as an exercise. First, bullet-proof the input string handling. Second, reimplement the "knowledge base" using a container class from the Eiffel library. Third, add logic which keeps duplicate animals from being added. Finally, make the tree of questions and answers storable on disk. This can allow the "knowledge base" of the program to become truly impressive.
+
+
+
+//***
+
+class Animal(object):
+
+
+    inherit
+
+    YES_NO_QUESTION
+
+    creation
+
+    make
+
+    feature
+
+    def __init__(self,animal):
+        self.animal = animal
+
+        do
+        animal_name:= clone(animal);
+
+        !!question.copy("Is it ");
+        if animal_name[0] in ('a', 'e', 'i', 'o', 'u'):
+            question.append("an ");
+        else
+            question.append("a ");
+
+        question.append(animal_name);
+
+    parent: QUESTION;
+
+        set_parent(new_parent: QUESTION) is
+        require
+        new_parent /= Void
+        do
+        parent:= new_parent;
+        end;
+        -- set_parent
+
+    animal_name: STRING;
+
+        yes_action is
+        do
+        io.put_string("Great, I got it!!%N");
+        end;
+        -- yes_action
+
+        no_action is
+        do
+        print ("Oops, don't know that one...%N");
+        add_animal;
+        end;
+        -- no_action
+
+    add_animal is
+    local
+    new_a: ANIMAL;
+    new_q: QUESTION;
+    do
+    print ("What is it? ");
+    io.read_line;
+    !!new_a.make(io.last_string);
+    foo = raw_input ("Please enter a question distingushing between a(n) " + animal_name + " and " + new_a.animal_name)
+    print (".%N ---> ")
+    !!new_q.make(foo);
+    newAnswer = raw_input ("The answer to this question for a(n) " + new_a.animal_name + " is [Y/N]? ")
+    io.read_line;
+    -- Set
+    up
+    branches
+    on
+    new
+    question
+    if newAnswer[0] == 'y' or newAnswer[0] == 'Y':
+        new_q.set_yes_branch(new_a)
+        new_q.set_no_branch(Current)
+    else:
+        new_q.set_no_branch(new_a)
+        new_q.set_yes_branch(Current)
+
+    -- Now
+    link
+    into
+    the
+    entire
+    structure
+    new_a.set_parent(new_q);
+    if Current = parent.yes_branch:
+        parent.set_yes_branch(new_q);
+    else:
+        parent.set_no_branch(new_q)
+
+    parent:= new_q;
+
+
+class Play(object):
+
+
+    creation
+
+    make
+
+    feature
+
+    zoo: QUESTION;
+
+    make is
+    local
+    finished: BOOLEAN;
+    ch: CHARACTER;
+    do
+    init_zoo
+    from
+
+    until
+    finished
+    loop
+    print ("Think of an animal...%N")
+    zoo.ask;
+    print ("Again [Y/N]? ")
+    io.read_line;
+    ch:= io.last_string.item(1)
+    finished:= (ch = 'n') or (ch = 'N')
+    end;
+    -- loop
+    print("Goodbye!!! %N")
+    end;
+
+    init_zoo is
+    local
+
+    q1 = Question()
+    a =  Animal()
+
+    do
+    !!q1.make("Is it a mamal");
+    !!a.make("cat");
+    q1.set_yes_branch(a);
+    a.set_parent(q1);
+    !!a.make("shark");
+    q1.set_no_branch(a);
+    a.set_parent(q1);
+    zoo:= q1;
+    end;
+
+
+
+class Question(object):
+
+    inherit
+
+    YES_NO_QUESTION
+
+    creation
+
+    make
+
+    feature
+
+    make(text: STRING) is
+    require
+    text /= Void
+    do
+    question:= clone(text);
+    end;
+    -- make
+
+    yes_branch: YES_NO_QUESTION;
+    -- Yes
+    branch
+    of
+    the
+    question
+    tree
+
+    set_yes_branch(newq: YES_NO_QUESTION) is
+    -- Set
+    yes
+    branch
+    require
+    newq /= Void
+    do
+    yes_branch:= newq;
+    end;
+
+    no_branch: YES_NO_QUESTION;
+    -- No
+    branch
+    of
+    the
+    tree
+
+    set_no_branch(newq: YES_NO_QUESTION) is
+    -- Set
+    no
+    branch
+    require
+    newq /= Void
+    do
+        no_branch:= newq;
+    end;
+
+    feature
+    {NONE}
+
+    def yes_action(self):
+        yes_branch.ask
+
+    def no_action(self):
+        no_branch.ask
+
+
+deferred class YES_NO_QUESTION(object):
+
+    feature
+
+            question : STRING;
+                    -- Question to ask
+
+            ask is
+                    -- Ask a yes/no/question
+            require
+                    question /= Void;
+            do
+                       print (question)
+                       ans = raw_input (" [Y/N]? ")
+                       if ans == 'y'or ans == 'Y':
+                              yes_action()
+                       else
+                              no_action()
+            end; -- ask
+
+
+    feature {NONE}
+
+            def yes_action(self):
+                    deferred
+
+            def no_action(self):
+                    deferred
+
+
+
+***//
